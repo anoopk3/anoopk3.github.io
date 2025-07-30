@@ -1,5 +1,347 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>D3 Narrative Visualization - Cars 2017</title>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f4f4f4;
+      padding: 20px;
+    }
+
+    svg {
+      background-color: #fff;
+      border: 1px solid #ccc;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      pointer-events: none;
+      font-size: 12px;
+    }
+
+    .scene-buttons button {
+      margin: 5px;
+      padding: 5px 10px;
+    }
+
+    .annotation {
+      font-size: 14px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    .nav-button {
+      margin: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+      border: 1px solid #666;
+      display: inline-block;
+    }
+
+    .navbar {
+      display: flex;
+      background-color: #343a40;
+      color: white;
+      padding: 1px 2px;
+      justify-content: flex-start;
+      width: 500px;
+      gap: 2px;
+    }
+
+    .navbar div {
+      cursor: pointer;
+      padding: 2px 16px;
+      border-radius: 5px;
+    }
+
+    .navbar div:hover {
+      background-color: #495057;
+    }
+
+    .navbar .active {
+      background-color: #007bff;
+    }
+  </style>
+</head>
+
 <body>
-  <h1>Tetsing</h1>
-</body>  
+  <h2>2017 Automobile Data Narrative</h2>
+  <div class="scene-buttons">
+    <span class="nav-button" id="prev">◀ Back</span>
+    <span class="nav-button" id="next">Next ▶</span>
+  </div>
+  <div class="annotation"></div>
+  <svg width="800" height="700">
+  </svg>
+  <div class="tooltip" style="opacity: 0;"></div>
+  <script>
+    const svg = d3.select("svg"),
+      margin = {
+        top: 50,
+        right: 50,
+        bottom: 50,
+        left: 70
+      },
+      width = +svg.attr("width") - margin.left - margin.right,
+      height = +svg.attr("height") - margin.top - margin.bottom - 100,
+      g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const scenes = [{
+        id: 0,
+        title: "All Cars",
+        filter: d => true
+      },
+      {
+        id: 1,
+        title: "Electric Cars",
+        filter: d => d.Fuel === "Electricity"
+      },
+      {
+        id: 2,
+        title: "Gasoline Cars",
+        filter: d => d.Fuel === "Gasoline"
+      },
+      {
+        id: 3,
+        title: "Diesel Cars",
+        filter: d => d.Fuel === "Diesel"
+      },
+    ];
+
+    let current = 0;
+    const slides = d3.select("#slides");
+
+    const tooltip = d3.select(".tooltip");
+    const annotation = d3.select(".annotation");
+
+    let x = d3.scaleLog().range([0, width]).base(10);
+    let y = d3.scaleLog().range([height, 0]).base(10);
+    let radius = d3.scaleLinear().range([3, 10]);
+
+    let color = d3.scaleOrdinal(d3.schemeCategory10);
+    let data;
+
+    // Load CSV
+    d3.csv("https://flunky.github.io/cars2017.csv").then(raw => {
+      data_backup = raw.filter(d => d.AverageCityMPG > 0 && d.AverageHighwayMPG > 0);
+      data = raw.filter(d => d.AverageCityMPG > 0 && d.AverageHighwayMPG > 0);
+
+      data.forEach(d => {
+
+        d.AverageCityMPG = +d.AverageCityMPG;
+        d.AverageHighwayMPG = +d.AverageHighwayMPG;
+        d.EngineCylinders = +d.EngineCylinders;
+      });
+
+      x.domain(d3.extent(data, d => d.AverageCityMPG));
+      y.domain(d3.extent(data, d => d.AverageHighwayMPG));
+      radius.domain(d3.extent(data, d => d.EngineCylinders));
+
+      // Axes
+      g.append("g")
+        .attr("class", "x-axis")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x).ticks(10, "~s"));
+
+      g.append("g")
+        .attr("class", "y-axis")
+        .call(d3.axisLeft(y).ticks(10, "~s"));
+
+      g.append("text")
+        .attr("x", width / 2)
+        .attr("y", height + 35)
+        .attr("text-anchor", "middle")
+        .text("Average City MPG (log scale)");
+
+      g.append("text")
+        .attr("x", -height / 2)
+        .attr("y", -50)
+        .attr("transform", "rotate(-90)")
+        .attr("text-anchor", "middle")
+        .text("Average Highway MPG (log scale)");
+
+      svg.append("foreignObject")
+        .attr("width", 500)
+        .attr("height", 100)
+        .attr("transform", `translate(100,${height + 100})`)
+        .append("xhtml:div") // Use xhtml:div for HTML content within foreignObject
+        .style("background-color", "lightblue")
+        .html(`
+            <div class="navbar">
+              <div id="nav0" class="active" onclick="showScene(0)">Overview</div>
+              <div id="nav1" onclick="showScene(1)">Electric Cars</div>
+              <div id="nav2" onclick="showScene(2)">Gasoline Cars</div>
+              <div id="nav3" onclick="showScene(3)">Diesel Cars</div>
+            </div>
+	          `);
+
+      svg.append("foreignObject")
+        .attr("width", 500)
+        .attr("height", 100)
+        .attr("transform", `translate(100,${height + 150})`)
+        .append("xhtml:div") // Use xhtml:div for HTML content within foreignObject
+        // .style("background-color", "lightblue")
+        .html(`
+            <div class="cyloption">
+              <label for="EngineCylinders">Choose number of EngineCylinders:</label>
+              <select id="comparison" onchange="changeComp()">
+                <option value="equal">Equal to</option>
+                <option value="less">Less than</option>
+                <option value="greater">Greater than</option>
+              </select>
+              <select id="EngineCylinders" onchange="changeOption()">
+                <option id="ALL" value="ALL">All</option>
+                <option id="0" value="0">0</option>
+                <option id="2" value="2">2</option>
+                <option id="3" value="3">3</option>
+                <option id="4" value="4">4</option>
+                <option id="6" value="6">6</option>
+                <option id="8" value="8">8</option>
+                <option id="10" value="10">10</option>
+                <option id="12" value="12">12</option>
+              </select>
+            </div>
+          `);
+      showScene(0);
+    });
+
+    function updateChart(filterFn, highlightColor, note) {
+      selValue = d3.select("#EngineCylinders").property("value");
+      console.log("selValue is cccccc ---" + selValue)
+      selComp = d3.select("#comparison").property("value");
+      console.log("selComp is cccccccccccc---" + selComp)
+      //filter data
+      if (selValue == 'ALL')
+        data = data_backup
+      else {
+        if (selComp == 'equal') {
+          data = data_backup.filter(d => d.EngineCylinders == Number(selValue));
+        }
+        if (selComp == 'less') {
+          data = data_backup.filter(d => d.EngineCylinders < Number(selValue));
+        }
+        if (selComp == 'greater') {
+          data = data_backup.filter(d => d.EngineCylinders > Number(selValue));
+        }
+
+      }
+
+      const circles = g.selectAll("circle").data(data);
+      circles.exit().remove();
+      const enter = circles.enter().append("circle")
+        .attr("cx", d => x(d.AverageCityMPG))
+        .attr("cy", d => y(d.AverageHighwayMPG))
+        .attr("r", d => radius(d.EngineCylinders) || 4)
+        //.attr("fill", d => color(d.Fuel))
+        //.attr("fill", "red")
+        .attr("opacity", 0.7)
+        .on("mouseover", function(d) {
+          d3.select(this).attr("stroke", "#000").attr("stroke-width", 1.2);
+          tooltip.style("opacity", 1)
+            .html(`<strong>${d.Make}</strong><br>Fuel: ${d.Fuel}<br>Cylinders: ${d.EngineCylinders}<br>City MPG: ${d.AverageCityMPG}<br>Highway MPG: ${d.AverageHighwayMPG}`)
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", function() {
+          d3.select(this).attr("stroke", null);
+          tooltip.style("opacity", 0);
+        });
+
+      enter.merge(circles)
+        .transition().duration(800)
+        .attr("fill", d => filterFn(d) ? highlightColor : "#ccc")
+        .attr("opacity", d => filterFn(d) ? 0.9 : 0.3);
+
+      annotation.text(note);
+    }
+
+    function showScene(sceneNum) {
+      console.log('nav' + sceneNum)
+      switch (sceneNum) {
+        case 0:
+          // updateChart(() => true, d => color(d.Fuel), "Scene 1: Overview of all cars. Hover for details.");
+          updateChart(() => true, "grey", "Scene 1: Overview of all cars. Hover for details.");
+          setActiveButton(sceneNum)
+          break;
+        case 1:
+          updateChart(d => d.Fuel === "Electricity", "blue", "Scene 2: Highlighting electric cars.");
+          setActiveButton(sceneNum)
+          break;
+        case 2:
+          updateChart(d => d.Fuel === "Gasoline", "red", "Scene 3: Highlighting Gasoline cars.");
+          setActiveButton(sceneNum)
+          break;
+        case 3:
+
+          updateChart(d => d.Fuel === "Diesel", "green", "Scene 4: Highlighting Diesel cars.");
+          setActiveButton(sceneNum)
+
+          break;
+      }
+    }
+
+    d3.select("#next").on("click", () => {
+      console.log("cliked nexyt " + current)
+      current = Math.min(scenes.length - 1, current + 1);
+      console.log("current " + current)
+      showScene(current)
+    });
+    d3.select("#prev").on("click", () => {
+      console.log("cliked prev")
+      current = Math.max(0, current - 1);
+      showScene(current)
+    });
+
+    function changeOption() {
+      console.log("changeOption")
+      showScene(current)
+    }
+
+    function changeComp() {
+
+      selValue = d3.select("#EngineCylinders").property("value");
+      console.log("selValue is 2222---" + selValue)
+      console.log("changeComp33333")
+      selComp = d3.select("#comparison").property("value");
+      console.log("equal equal equal" + selComp)
+      d3.select("#ALL").property("disabled", false);
+      //if (selComp == 'equal')
+      //   console.log("equal equal equal")
+      if (selComp == 'less') {
+        console.log("in lessssssssssssss")
+        d3.select("#ALL").property("disabled", true);
+        d3.select("#EngineCylinders").property("value", selValue == 'ALL' ? 12 : selValue)
+      }
+
+      if (selComp == 'greater') {
+        console.log("in greaterrrrrrr")
+        d3.select("#ALL").property("disabled", true);
+        d3.select("#EngineCylinders").property("value", selValue == 'ALL' ? 0 : selValue)
+      }
+
+
+      showScene(current)
+    }
+
+    //updateScene(0);
+    function setActiveButton(activeId) {
+      current = activeId;
+      activeId = 'nav' + activeId;
+      d3.select(".navbar").selectAll("div").each(function(d, i, nodes) {
+        console.log(this.id)
+        d3.select(this).attr("class", this.id === activeId ? "active" : "");
+      });
+    }
+  </script>
+</body>
+
 </html>
