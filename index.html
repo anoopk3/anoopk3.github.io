@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <title>D3 Narrative Visualization - Cars 2017</title>
   <script src="https://d3js.org/d3.v5.min.js"></script>
+
   <style>
     body {
       font-family: sans-serif;
@@ -80,7 +81,7 @@
     <span class="nav-button" id="next">Next ▶</span>
   </div>
   <div class="annotation"></div>
-  <svg width="800" height="700">
+  <svg width="1100" height="700">
   </svg>
   <div class="tooltip" style="opacity: 0;"></div>
   <script>
@@ -91,7 +92,7 @@
         bottom: 50,
         left: 70
       },
-      width = +svg.attr("width") - margin.left - margin.right,
+      width = +svg.attr("width") - margin.left - margin.right - 300,
       height = +svg.attr("height") - margin.top - margin.bottom - 100,
       g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -150,11 +151,15 @@
       g.append("g")
         .attr("class", "x-axis")
         .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(x).ticks(10, "~s"));
+        .call(d3.axisBottom(x)
+          .tickValues([10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150])
+          .ticks(10, "~s"));
 
       g.append("g")
         .attr("class", "y-axis")
-        .call(d3.axisLeft(y).ticks(10, "~s"));
+        .call(d3.axisLeft(y)
+          .tickValues([20, 30, 40, 50, 60, 70, 80, 90, 100, 120])
+          .ticks(10, "~s"));
 
       g.append("text")
         .attr("x", width / 2)
@@ -214,26 +219,34 @@
       showScene(0);
     });
 
-    function updateChart(filterFn, highlightColor, note) {
+    function updateChart(filterFn, highlightColor, note, carType) {
+      svg.selectAll(".annotation-group").remove();
       selValue = d3.select("#EngineCylinders").property("value");
       console.log("selValue is cccccc ---" + selValue)
       selComp = d3.select("#comparison").property("value");
       console.log("selComp is cccccccccccc---" + selComp)
       //filter data
-      if (selValue == 'ALL')
-        data = data_backup
-      else {
+      if (selValue == 'ALL') {
+        // data = data_backup
+        fn2 = d => true
+      } else {
         if (selComp == 'equal') {
-          data = data_backup.filter(d => d.EngineCylinders == Number(selValue));
+          //  data = data_backup.filter(d => d.EngineCylinders == Number(selValue));
+          fn2 = d => d.EngineCylinders == Number(selValue)
         }
         if (selComp == 'less') {
-          data = data_backup.filter(d => d.EngineCylinders < Number(selValue));
+          // data = data_backup.filter(d => d.EngineCylinders < Number(selValue));
+          fn2 = d => d.EngineCylinders < Number(selValue)
         }
         if (selComp == 'greater') {
-          data = data_backup.filter(d => d.EngineCylinders > Number(selValue));
+          // data = data_backup.filter(d => d.EngineCylinders > Number(selValue));
+          fn2 = d => d.EngineCylinders > Number(selValue)
         }
 
       }
+
+      // data_annot = (filterFn(data));
+      data_annot = data.filter(filterFn).filter(fn2);
 
       const circles = g.selectAll("circle").data(data);
       circles.exit().remove();
@@ -258,10 +271,60 @@
 
       enter.merge(circles)
         .transition().duration(800)
+        //.attr("id", d => d.Make + "-" + d.EngineCylinders + "-" + d.AverageCityMPG + "-" + d.AverageHighwayMPG)
+        .attr("id", d => d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG)
+        .attr("class", d => d.Make + "-" + d.EngineCylinders + "-" + d.AverageCityMPG + "-" + d.AverageHighwayMPG)
+        .attr("visibility", d => fn2(d) ? "visible" : "hidden")
         .attr("fill", d => filterFn(d) ? highlightColor : "#ccc")
+        .style("stroke", "none")
         .attr("opacity", d => filterFn(d) ? 0.9 : 0.3);
-
+      console.log("adding id")
       annotation.text(note);
+
+      maxCity = d3.max(data_annot, d => d.AverageCityMPG);
+      highways = data_annot.filter(d => d.AverageCityMPG === maxCity);
+
+      //myData = highways[0]?.AverageHighwayMPG;
+      //console.log(myData)
+
+      //maxHighway = d3.max(highways, d => d.AverageHighwayMPG);
+      maxHighway = highways[0]?.AverageHighwayMPG;
+      annotMake = highways[0]?.Make;
+      annotCylinder = highways[0]?.EngineCylinders;
+
+      //annotId = annotMake + "-" + annotCylinder + "-" + maxCity + "-" + maxHighway;
+      annotId = "#" + annotMake + annotCylinder + maxCity + maxHighway;
+
+      myArr = {
+        "equal": "equal to ",
+        "less": "less than ",
+        "greater": "greater than "
+      };
+
+      text1 = (selValue == 'ALL') ? "" : " which has number of cylinders " + myArr[selComp] + selValue;
+
+      if ((maxCity !== undefined) & (maxHighway !== undefined)) {
+
+        svg.append("text")
+          .attr("class", "annotation-group")
+          .attr("x", x(maxCity))
+          .attr("y", y(maxHighway) + 35)
+          .text("Highest city MPG of " + carType + " cars " + text1)
+          .attr("font-size", "12px")
+          .attr("fill", "black");
+
+        setTimeout(() => {
+          annotCircle = d3.select(annotId)
+          //console.log(annotCircle)
+          annotCircle.attr("fill", "red");
+          annotCircle.style("stroke", "#ffcc00").attr("stroke-width", 5)
+        }, 100); // small delay to ensure it's rendered
+        //console.log(svg)
+      }
+
+
+
+
     }
 
     function showScene(sceneNum) {
@@ -269,20 +332,20 @@
       switch (sceneNum) {
         case 0:
           // updateChart(() => true, d => color(d.Fuel), "Scene 1: Overview of all cars. Hover for details.");
-          updateChart(() => true, "grey", "Scene 1: Overview of all cars. Hover for details.");
+          updateChart(() => true, "grey", "Scene 1: Overview of all cars. Hover for details.", "All type of");
           setActiveButton(sceneNum)
           break;
         case 1:
-          updateChart(d => d.Fuel === "Electricity", "blue", "Scene 2: Highlighting electric cars.");
+          updateChart(d => d.Fuel === "Electricity", "blue", "Scene 2: Highlighting electric cars.", "Electricity");
           setActiveButton(sceneNum)
           break;
         case 2:
-          updateChart(d => d.Fuel === "Gasoline", "red", "Scene 3: Highlighting Gasoline cars.");
+          updateChart(d => d.Fuel === "Gasoline", "red", "Scene 3: Highlighting Gasoline cars.", "Gasoline");
           setActiveButton(sceneNum)
           break;
         case 3:
 
-          updateChart(d => d.Fuel === "Diesel", "green", "Scene 4: Highlighting Diesel cars.");
+          updateChart(d => d.Fuel === "Diesel", "green", "Scene 4: Highlighting Diesel cars.", "Diesel");
           setActiveButton(sceneNum)
 
           break;
