@@ -245,8 +245,8 @@
           `);
 
       const legendData = [{
-          label: "Gas",
-          color: "red"
+          label: "Gasoline",
+          color: "purple"
         },
         {
           label: "Electricity",
@@ -282,7 +282,7 @@
           return "blue"
           break;
         case "Gasoline":
-          return "red"
+          return "purple"
           break;
         case "Diesel":
           return "green"
@@ -342,13 +342,14 @@
         });
 
       enter.merge(circles)
-        .transition().duration(800)
+        .transition().duration(100)
         .attr("id", d => d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG)
         .attr("class", d => d.Make + "-" + d.EngineCylinders + "-" + d.AverageCityMPG + "-" + d.AverageHighwayMPG)
         .attr("visibility", d => fn2(d) ? "visible" : "hidden")
-        .attr("fill", d => filterFn(d) ? (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? "black" : getHighlightColor(d.Fuel) : "#ccc")
-        .attr("stroke-width", d => (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? 3 : "none")
-        .style("stroke", d => (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? "yellow" : "none")
+        // .attr("fill", d => filterFn(d) ? (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? "black" : getHighlightColor(d.Fuel) : "#ccc")
+        .attr("fill", d => filterFn(d) ? getHighlightColor(d.Fuel) : "#ccc")
+        .attr("stroke-width", d => (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? 3 : 0)
+        .style("stroke", d => (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? "red" : "none")
         .attr("opacity", d => filterFn(d) ? 0.9 : 0.3);
 
       annotation.text(note);
