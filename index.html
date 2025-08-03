@@ -71,6 +71,23 @@
     .navbar .active {
       background-color: #007bff;
     }
+
+    .legend-box {
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+
+    .legend-item {
+      margin: 5px;
+      display: flex;
+      align-items: center;
+    }
+
+    .legend-color {
+      width: 15px;
+      height: 15px;
+      margin-right: 5px;
+    }
   </style>
 </head>
 
@@ -216,46 +233,100 @@
               </select>
             </div>
           `);
+
+      svg.append("foreignObject")
+        .attr("width", 500)
+        .attr("height", 100)
+        .attr("transform", `translate(${width+150},${height - 350})`)
+        .append("xhtml:div") // Use xhtml:div for HTML content within foreignObject
+        // .style("background-color", "lightblue")
+        .html(`
+            <div id="legend" class="legend-box"></div>
+          `);
+
+      const legendData = [{
+          label: "Gas",
+          color: "red"
+        },
+        {
+          label: "Electricity",
+          color: "blue"
+        },
+        {
+          label: "Diesel",
+          color: "green"
+        }
+      ];
+
+
+      const legend = d3.select("#legend")
+        .selectAll("div")
+        .data(legendData)
+        .enter()
+        .append("div")
+        .attr("class", "legend-item");
+
+      legend.append("div")
+        .attr("class", "legend-color")
+        .style("background-color", d => d.color);
+
+      legend.append("span")
+        .text(d => d.label);
+
       showScene(0);
     });
+
+    function getHighlightColor(carType) {
+      switch (carType) {
+        case "Electricity":
+          return "blue"
+          break;
+        case "Gasoline":
+          return "red"
+          break;
+        case "Diesel":
+          return "green"
+          break;
+
+      }
+
+    }
 
     function updateChart(filterFn, highlightColor, note, carType) {
       svg.selectAll(".annotation-group").remove();
       selValue = d3.select("#EngineCylinders").property("value");
-      console.log("selValue is cccccc ---" + selValue)
       selComp = d3.select("#comparison").property("value");
-      console.log("selComp is cccccccccccc---" + selComp)
       //filter data
       if (selValue == 'ALL') {
-        // data = data_backup
         fn2 = d => true
       } else {
         if (selComp == 'equal') {
-          //  data = data_backup.filter(d => d.EngineCylinders == Number(selValue));
           fn2 = d => d.EngineCylinders == Number(selValue)
         }
         if (selComp == 'less') {
-          // data = data_backup.filter(d => d.EngineCylinders < Number(selValue));
           fn2 = d => d.EngineCylinders < Number(selValue)
         }
         if (selComp == 'greater') {
-          // data = data_backup.filter(d => d.EngineCylinders > Number(selValue));
           fn2 = d => d.EngineCylinders > Number(selValue)
         }
 
       }
 
-      // data_annot = (filterFn(data));
       data_annot = data.filter(filterFn).filter(fn2);
-
+      maxCity = d3.max(data_annot, d => d.AverageCityMPG);
+      highways = data_annot.filter(d => d.AverageCityMPG === maxCity);
+      maxHighway = highways[0]?.AverageHighwayMPG;
+      annotMake = highways[0]?.Make;
+      annotCylinder = highways[0]?.EngineCylinders;
+      annotId = annotMake + annotCylinder + maxCity + maxHighway;
+      console.log("annotId ----" + annotId)
       const circles = g.selectAll("circle").data(data);
       circles.exit().remove();
       const enter = circles.enter().append("circle")
         .attr("cx", d => x(d.AverageCityMPG))
         .attr("cy", d => y(d.AverageHighwayMPG))
-        .attr("r", d => radius(d.EngineCylinders) || 4)
-        //.attr("fill", d => color(d.Fuel))
-        //.attr("fill", "red")
+        //.attr("r", d => (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? (radius(d.EngineCylinders) || 4) + 40 : (radius(d.EngineCylinders) || 4))
+        .attr("r", d => (radius(d.EngineCylinders) || 4))
         .attr("opacity", 0.7)
         .on("mouseover", function(d) {
           d3.select(this).attr("stroke", "#000").attr("stroke-width", 1.2);
@@ -267,33 +338,22 @@
         .on("mouseout", function() {
           d3.select(this).attr("stroke", null);
           tooltip.style("opacity", 0);
+          showScene(current)
         });
 
       enter.merge(circles)
         .transition().duration(800)
-        //.attr("id", d => d.Make + "-" + d.EngineCylinders + "-" + d.AverageCityMPG + "-" + d.AverageHighwayMPG)
         .attr("id", d => d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG)
         .attr("class", d => d.Make + "-" + d.EngineCylinders + "-" + d.AverageCityMPG + "-" + d.AverageHighwayMPG)
         .attr("visibility", d => fn2(d) ? "visible" : "hidden")
-        .attr("fill", d => filterFn(d) ? highlightColor : "#ccc")
-        .style("stroke", "none")
+        .attr("fill", d => filterFn(d) ? (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? "black" : getHighlightColor(d.Fuel) : "#ccc")
+        .attr("stroke-width", d => (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? 3 : "none")
+        .style("stroke", d => (d.Make + d.EngineCylinders + d.AverageCityMPG + d.AverageHighwayMPG === annotId) ? "yellow" : "none")
         .attr("opacity", d => filterFn(d) ? 0.9 : 0.3);
-      console.log("adding id")
+
       annotation.text(note);
 
-      maxCity = d3.max(data_annot, d => d.AverageCityMPG);
-      highways = data_annot.filter(d => d.AverageCityMPG === maxCity);
 
-      //myData = highways[0]?.AverageHighwayMPG;
-      //console.log(myData)
-
-      //maxHighway = d3.max(highways, d => d.AverageHighwayMPG);
-      maxHighway = highways[0]?.AverageHighwayMPG;
-      annotMake = highways[0]?.Make;
-      annotCylinder = highways[0]?.EngineCylinders;
-
-      //annotId = annotMake + "-" + annotCylinder + "-" + maxCity + "-" + maxHighway;
-      annotId = "#" + annotMake + annotCylinder + maxCity + maxHighway;
 
       myArr = {
         "equal": "equal to ",
@@ -312,26 +372,13 @@
           .text("Highest city MPG of " + carType + " cars " + text1)
           .attr("font-size", "12px")
           .attr("fill", "black");
-
-        setTimeout(() => {
-          annotCircle = d3.select(annotId)
-          //console.log(annotCircle)
-          annotCircle.attr("fill", "red");
-          annotCircle.style("stroke", "#ffcc00").attr("stroke-width", 5)
-        }, 100); // small delay to ensure it's rendered
-        //console.log(svg)
       }
-
-
-
-
     }
 
     function showScene(sceneNum) {
       console.log('nav' + sceneNum)
       switch (sceneNum) {
         case 0:
-          // updateChart(() => true, d => color(d.Fuel), "Scene 1: Overview of all cars. Hover for details.");
           updateChart(() => true, "grey", "Scene 1: Overview of all cars. Hover for details.", "All type of");
           setActiveButton(sceneNum)
           break;
@@ -353,49 +400,36 @@
     }
 
     d3.select("#next").on("click", () => {
-      console.log("cliked nexyt " + current)
       current = Math.min(scenes.length - 1, current + 1);
-      console.log("current " + current)
       showScene(current)
     });
     d3.select("#prev").on("click", () => {
-      console.log("cliked prev")
       current = Math.max(0, current - 1);
       showScene(current)
     });
 
     function changeOption() {
-      console.log("changeOption")
       showScene(current)
     }
 
     function changeComp() {
 
       selValue = d3.select("#EngineCylinders").property("value");
-      console.log("selValue is 2222---" + selValue)
-      console.log("changeComp33333")
       selComp = d3.select("#comparison").property("value");
-      console.log("equal equal equal" + selComp)
+      //     console.log("equal equal equal" + selComp)
       d3.select("#ALL").property("disabled", false);
-      //if (selComp == 'equal')
-      //   console.log("equal equal equal")
       if (selComp == 'less') {
-        console.log("in lessssssssssssss")
         d3.select("#ALL").property("disabled", true);
         d3.select("#EngineCylinders").property("value", selValue == 'ALL' ? 12 : selValue)
       }
 
       if (selComp == 'greater') {
-        console.log("in greaterrrrrrr")
         d3.select("#ALL").property("disabled", true);
         d3.select("#EngineCylinders").property("value", selValue == 'ALL' ? 0 : selValue)
       }
-
-
       showScene(current)
     }
 
-    //updateScene(0);
     function setActiveButton(activeId) {
       current = activeId;
       activeId = 'nav' + activeId;
