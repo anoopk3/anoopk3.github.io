@@ -199,7 +199,7 @@
         .style("background-color", "lightblue")
         .html(`
             <div class="navbar">
-              <div id="nav0" class="active" onclick="showScene(0)">Overview</div>
+              <div id="nav0" class="active" onclick="showScene(0)">All Cars</div>
               <div id="nav1" onclick="showScene(1)">Electric Cars</div>
               <div id="nav2" onclick="showScene(2)">Gasoline Cars</div>
               <div id="nav3" onclick="showScene(3)">Diesel Cars</div>
@@ -380,7 +380,7 @@
       console.log('nav' + sceneNum)
       switch (sceneNum) {
         case 0:
-          updateChart(() => true, "grey", "Scene 1: Overview of all cars. Hover for details.", "All type of");
+          updateChart(() => true, "grey", "Scene 1: Overview of all type cars. Hover for details.", "All type of");
           setActiveButton(sceneNum)
           break;
         case 1:
